@@ -57,9 +57,7 @@ export class ChatController {
 			session.source = session.city;
 		}
 
-		const missingFields = ["source", "destination", "date", "intent"].filter(
-			(field) => !session[field]
-		);
+		const missingFields = ChatController.getMissingFields(session);
 
 		if (missingFields.length > 0) {
 			logger.info(`Missing fields: ${missingFields.join(", ")}`);
@@ -139,6 +137,20 @@ export class ChatController {
 		const session = {};
 		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 		console.log("Session cleared.");
+	}
+
+	private static getMissingFields(session: any): string[] {
+		switch (session.intent) {
+			case IntentEnum.FLIGHT_SEARCH:
+				return ["source", "destination", "date"].filter(
+					(field) => !session[field]
+				);
+			case IntentEnum.RESTAURANT_SEARCH:
+			case IntentEnum.HOTEL_SEARCH:
+				return ["city"].filter((field) => !session[field]);
+			default:
+				return [];
+		}
 	}
 }
 
