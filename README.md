@@ -55,8 +55,11 @@ GOOGLE_API_KEY=your_google_api_key
 ## Sample Prompts
 
 - "Find flights from Delhi to Mumbai."
-- "Show me 5-star hotels in Bangalore."
-- "List restaurants in Chennai with North Indian cuisine."
+- "Show me flights from Delhi."
+- "May 25."
+- "Mumbai."
+- "List restaurants in Mumbai."
+- "List hotels in Mumbai under 20000."
 
 ## Routes
 
