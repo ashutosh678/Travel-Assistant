@@ -2,7 +2,7 @@ module.exports = {
 	apps: [
 		{
 			name: "travel-assistant",
-			script: "./dist/server.js",
+			script: "./dist/app.js",
 			instances: 1,
 			exec_mode: "fork",
 			watch: false,
