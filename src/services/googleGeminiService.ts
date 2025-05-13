@@ -69,7 +69,7 @@ export class GoogleGeminiService {
 				contents: finalPrompt,
 				config: {
 					responseMimeType: "application/json",
-					responseSchema: responseSchema, // Use the defined response schema
+					responseSchema: responseSchema,
 				},
 			});
 

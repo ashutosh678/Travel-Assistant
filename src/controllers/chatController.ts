@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-// import { AIService } from "../services/aiService";
 import Flight from "../models/flights";
 import Restaurant from "../models/restaurants";
 import Hotel from "../models/hotels";
