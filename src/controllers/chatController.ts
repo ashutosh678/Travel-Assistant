@@ -39,7 +39,7 @@ export class ChatController {
 		// Store updated session in cookies
 		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 
-		if (session.city) {
+		if (session.city && session.intent !== IntentEnum.FLIGHT_SEARCH) {
 			switch (session.intent) {
 				case IntentEnum.RESTAURANT_SEARCH:
 					return await ChatController.handleRestaurantSearch(session.city, res);
@@ -53,6 +53,12 @@ export class ChatController {
 						session,
 					});
 			}
+		}
+
+		if (session.city && !session.destination) {
+			session.destination = session.city;
+		} else if (session.city && !session.source) {
+			session.source = session.city;
 		}
 
 		// Check for missing data
