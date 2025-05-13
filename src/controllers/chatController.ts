@@ -6,13 +6,21 @@ import Hotel from "../models/hotels";
 import { GoogleGeminiService } from "../services/googleGeminiService";
 import { IntentEnum } from "../enums/IntentEnum";
 import { logger } from "../utils/logger";
+import { extractDate } from "../helpers/extractDate";
+import { extractFilters } from "../helpers/extractFilters";
+import {
+	getSession,
+	storeSession,
+	clearSession,
+} from "../helpers/sessionManager";
+
 const geminiService = new GoogleGeminiService();
 
 export class ChatController {
 	static async handleChat(req: Request, res: Response) {
 		try {
 			const userMessage = req.body.message;
-			let session = ChatController.getSession(req);
+			let session = getSession(req);
 
 			logger.info("Received request:", { userMessage, session });
 
@@ -26,10 +34,10 @@ export class ChatController {
 
 			logger.info("Session:", session);
 
-			ChatController.storeSession(res, session);
+			storeSession(res, session);
 
 			if (ChatController.isIntentHandled(session)) {
-				const filters = ChatController.extractFilters(userMessage);
+				const filters = extractFilters(userMessage);
 				return await ChatController.handleIntent(session, res, filters);
 			}
 
@@ -90,8 +98,7 @@ export class ChatController {
 				? `Found ${flightsFound} flights from ${source} to ${destination} on ${extractedDate.toDateString()}.`
 				: `No flights found from ${source} to ${destination} on ${extractedDate.toDateString()}.`;
 
-		session = {};
-		res.cookie("session", JSON.stringify(session), { httpOnly: true });
+		clearSession(res);
 
 		res.json({ result: flights, message: responseText, session });
 	}
@@ -105,7 +112,7 @@ export class ChatController {
 			restaurants.length > 0
 				? `Found ${restaurants.length} restaurants in ${location}.`
 				: `No restaurants found in ${location}.`;
-		this.clearSession(res);
+		clearSession(res);
 		res.json({ result: restaurants, message: responseText });
 	}
 
@@ -123,14 +130,8 @@ export class ChatController {
 			hotels.length > 0
 				? `Found ${hotels.length} hotels in ${city}.`
 				: `No hotels found in ${city}.`;
-		this.clearSession(res);
+		clearSession(res);
 		res.json({ result: hotels, message: responseText });
-	}
-
-	static clearSession(res: Response) {
-		const session = {};
-		res.cookie("session", JSON.stringify(session), { httpOnly: true });
-		console.log("Session cleared.");
 	}
 
 	private static getMissingFields(session: any): string[] {
@@ -145,25 +146,6 @@ export class ChatController {
 			default:
 				return [];
 		}
-	}
-
-	private static extractFilters(userMessage: string): any {
-		const filters: any = {};
-		const lowerMatch = userMessage.match(/under\s*₹?(\d+)/i);
-		const greaterMatch = userMessage.match(/over\s*₹?(\d+)/i);
-
-		if (lowerMatch) {
-			filters.price = { ...filters.price, $lte: parseInt(lowerMatch[1]) };
-		}
-		if (greaterMatch) {
-			filters.price = { ...filters.price, $gte: parseInt(greaterMatch[1]) };
-		}
-
-		return filters;
-	}
-
-	private static getSession(req: Request): any {
-		return req.cookies.session ? JSON.parse(req.cookies.session) : {};
 	}
 
 	private static async getStructuredOutput(
@@ -186,11 +168,16 @@ export class ChatController {
 				session.date = extractedDate;
 			}
 		}
+		if (session.intent === IntentEnum.FLIGHT_SEARCH) {
+			if (session.city) {
+				if (!session.source) {
+					session.source = session.city;
+				} else if (!session.destination) {
+					session.destination = session.city;
+				}
+			}
+		}
 		return session;
-	}
-
-	private static storeSession(res: Response, session: any): void {
-		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 	}
 
 	private static isIntentHandled(session: any): boolean {
@@ -229,25 +216,4 @@ export class ChatController {
 			session,
 		});
 	}
-}
-
-function extractDate(msg: string): Date | null {
-	const match = msg.match(
-		/\b(\d{1,2})\s*(May|June|July)|\b(May|June|July)\s*(\d{1,2})\b/i
-	);
-	if (match) {
-		const day = match[1] || match[4];
-		const month = match[2] || match[3];
-		const year = new Date().getFullYear();
-		const monthIndex = {
-			May: 4,
-			June: 5,
-			July: 6,
-		}[month.charAt(0).toUpperCase() + month.slice(1).toLowerCase()];
-		const date = new Date(
-			Date.UTC(year, monthIndex, parseInt(day), 12, 0, 0, 0)
-		);
-		return date;
-	}
-	return null;
 }
