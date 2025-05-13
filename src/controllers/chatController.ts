@@ -13,20 +13,17 @@ export class ChatController {
 		const userMessage = req.body.message;
 		let session = req.cookies.session ? JSON.parse(req.cookies.session) : {};
 
-		console.log("Received request:", { userMessage, session });
+		logger.info("Received request:", { userMessage, session });
 
-		// Fetch structured output from Google Gemini API
 		const structuredOutput = await geminiService.generateStructuredOutput(
 			userMessage
 		);
-		console.log("Structured output:", structuredOutput);
+		logger.info("Structured output:", structuredOutput);
 
-		// Update session with structured data
 		structuredOutput.forEach((data) => {
 			session = { ...session, ...data };
 		});
 
-		// Attempt to extract date from user message if not provided
 		if (!session.date) {
 			const extractedDate = extractDate(userMessage);
 			if (extractedDate) {
@@ -34,9 +31,8 @@ export class ChatController {
 			}
 		}
 
-		console.log("Session:", session);
+		logger.info("Session:", session);
 
-		// Store updated session in cookies
 		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 
 		if (session.city && session.intent !== IntentEnum.FLIGHT_SEARCH) {
@@ -61,7 +57,6 @@ export class ChatController {
 			session.source = session.city;
 		}
 
-		// Check for missing data
 		const missingFields = ["source", "destination", "date", "intent"].filter(
 			(field) => !session[field]
 		);
@@ -148,15 +143,18 @@ export class ChatController {
 }
 
 function extractDate(msg: string): Date | null {
-	const match = msg.match(/\b(May|June|July)\s+\d{1,2}\b/); // Simple match
+	const match = msg.match(
+		/\b(\d{1,2})\s*(May|June|July)|\b(May|June|July)\s*(\d{1,2})\b/i
+	);
 	if (match) {
-		const [month, day] = match[0].split(" ");
-		const year = new Date().getFullYear(); // Use current year
+		const day = match[1] || match[4];
+		const month = match[2] || match[3];
+		const year = new Date().getFullYear();
 		const monthIndex = {
-			May: 4, // JavaScript months are 0-indexed (May is the 5th month, which is index 4)
+			May: 4,
 			June: 5,
 			July: 6,
-		}[month];
+		}[month.charAt(0).toUpperCase() + month.slice(1).toLowerCase()];
 		const date = new Date(
 			Date.UTC(year, monthIndex, parseInt(day), 12, 0, 0, 0)
 		);
