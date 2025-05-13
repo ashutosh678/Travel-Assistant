@@ -1,10 +1,11 @@
 import { Request, Response } from "express";
-import { AIService } from "../services/aiService";
+// import { AIService } from "../services/aiService";
 import Flight from "../models/flights";
 import Restaurant from "../models/restaurants";
 import Hotel from "../models/hotels";
 import { GoogleGeminiService } from "../services/googleGeminiService";
 import { IntentEnum } from "../enums/IntentEnum";
+import { logger } from "../utils/logger";
 const geminiService = new GoogleGeminiService();
 
 export class ChatController {
@@ -39,8 +40,6 @@ export class ChatController {
 		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 
 		if (session.city) {
-			// Handle different intents using the intent from the session
-			console.log("================");
 			switch (session.intent) {
 				case IntentEnum.RESTAURANT_SEARCH:
 					return await ChatController.handleRestaurantSearch(session.city, res);
@@ -48,7 +47,7 @@ export class ChatController {
 				case IntentEnum.HOTEL_SEARCH:
 					return await ChatController.handleHotelSearch(session.city, res);
 				default:
-					console.log("Could not understand the request");
+					logger.info("Could not understand the request");
 					res.json({
 						message: "Sorry, I couldn't understand your request.",
 						session,
@@ -62,7 +61,7 @@ export class ChatController {
 		);
 
 		if (missingFields.length > 0) {
-			console.log(`Missing fields: ${missingFields.join(", ")}`);
+			logger.info(`Missing fields: ${missingFields.join(", ")}`);
 			return res.json({
 				followUp: `Please provide the following missing information: ${missingFields.join(
 					", "
@@ -71,36 +70,14 @@ export class ChatController {
 			});
 		}
 
-		console.log("intent", session.intent);
-		console.log("intent type", IntentEnum.FLIGHT_SEARCH);
-
-		// Handle different intents using the intent from the session
-		switch (session.intent) {
-			case IntentEnum.FLIGHT_SEARCH:
-				await ChatController.handleFlightSearch(session, res);
-				break;
-			case IntentEnum.RESTAURANT_SEARCH:
-				await ChatController.handleRestaurantSearch(userMessage, res);
-				break;
-			case IntentEnum.HOTEL_SEARCH:
-				await ChatController.handleHotelSearch(userMessage, res);
-				break;
-			default:
-				console.log("Could not understand the request");
-				res.json({
-					message: "Sorry, I couldn't understand your request.",
-					session,
-				});
-		}
+		return await ChatController.handleFlightSearch(session, res);
 	}
 
 	private static async handleFlightSearch(session: any, res: Response) {
 		const { source, destination, date } = session;
 
-		// Use the extractDate function to parse the date
 		const extractedDate = extractDate(date);
 
-		// Check if extractedDate is valid
 		if (!extractedDate || isNaN(extractedDate.getTime())) {
 			console.log("Invalid date provided.");
 			return res.json({
@@ -109,10 +86,8 @@ export class ChatController {
 			});
 		}
 
-		// Log the extracted date for debugging
 		console.log("Extracted Date:", extractedDate);
 
-		// Convert the extractedDate to the desired ISO string format without timezone shift
 		const formattedDate = new Date(
 			Date.UTC(
 				extractedDate.getUTCFullYear(),
@@ -127,7 +102,6 @@ export class ChatController {
 
 		console.log("Querying flights with date:", formattedDate);
 
-		// Query the database using the formatted date
 		const flights = await Flight.find({
 			source,
 			destination,
@@ -140,9 +114,6 @@ export class ChatController {
 				? `Found ${flightsFound} flights from ${source} to ${destination} on ${extractedDate.toDateString()}.`
 				: `No flights found from ${source} to ${destination} on ${extractedDate.toDateString()}.`;
 
-		console.log("Response text:", responseText);
-
-		// Clear the session after processing
 		session = {};
 		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 
@@ -150,35 +121,24 @@ export class ChatController {
 	}
 
 	private static async handleRestaurantSearch(location: string, res: Response) {
-		console.log("location", location);
-		// const location = extractCity(userMessage);
 		const restaurants = await Restaurant.find({ location });
-		console.log("restaurants", restaurants);
-		// const responseText = await geminiService.generateText(
-		// 	`Found ${restaurants.length} restaurants in ${location}.`
-		// );
+		const session = {};
+		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 		res.json({ result: restaurants });
 	}
 
 	private static async handleHotelSearch(city: string, res: Response) {
 		const hotels = await Hotel.find({ city });
-		// const responseText = await geminiService.generateText(
-		// 	`Found ${hotels.length} hotels in ${city}.`
-		// );
+		const session = {};
+		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 		res.json({ result: hotels });
 	}
 
-	// Function to clear the session
 	static clearSession(res: Response) {
 		const session = {};
 		res.cookie("session", JSON.stringify(session), { httpOnly: true });
 		console.log("Session cleared.");
 	}
-}
-
-function extractCity(msg: string, preposition?: string): string | null {
-	const match = msg.match(/(?:from|in|to)\s+([A-Za-z]+)/);
-	return match ? match[1] : null;
 }
 
 function extractDate(msg: string): Date | null {
